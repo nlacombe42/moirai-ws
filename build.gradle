@@ -1,0 +1,29 @@
+apply plugin: 'java'
+
+defaultTasks 'tasks'
+
+group = 'net.nlacombe'
+version = '0.0.1'
+
+sourceCompatibility = 11
+targetCompatibility = 11
+
+dependencies {
+	compile 'com.google.api-client:google-api-client:1.23.0'
+	compile 'com.google.oauth-client:google-oauth-client-jetty:1.23.0'
+	compile 'com.google.apis:google-api-services-calendar:v3-rev305-1.23.0'
+	// compile 'org.apache.commons:commons-lang3:3.6'
+	// compile 'org.apache.commons:commons-collections4:4.1'
+	// compile 'org.slf4j:slf4j-api:1.7.25'
+	
+	// runtime 'ch.qos.logback:logback-classic:1.2.3'
+}
+
+repositories { 
+	mavenCentral()
+	mavenLocal()
+}
+
+wrapper {
+	gradleVersion = '5.1.1'
+}
