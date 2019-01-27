@@ -17,3 +17,4 @@ gradle-app.setting
 
 ### SECRETS ###
 google-client-secret.json
+secrets.properties

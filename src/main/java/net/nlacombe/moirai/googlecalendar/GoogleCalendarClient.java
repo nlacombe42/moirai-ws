@@ -1,4 +1,4 @@
-package net.nlacombe.moirai;
+package net.nlacombe.moirai.googlecalendar;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
@@ -13,6 +13,7 @@ import com.google.api.client.util.DateTime;
 import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.calendar.Calendar;
 import com.google.api.services.calendar.CalendarScopes;
+import com.google.api.services.calendar.model.CalendarListEntry;
 import com.google.api.services.calendar.model.Event;
 import com.google.api.services.calendar.model.EventDateTime;
 import org.slf4j.Logger;
@@ -24,24 +25,63 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.security.GeneralSecurityException;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 
-public class GoogleCalendarService {
+public class GoogleCalendarClient {
 
     private static final String APPLICATION_NAME = "morai";
     private static final String CREDENTIALS_CLASSPATH = "/google-client-secret.json";
-    private static final Logger logger = LoggerFactory.getLogger(GoogleCalendarService.class);
+    private static final Logger logger = LoggerFactory.getLogger(GoogleCalendarClient.class);
 
     private Calendar googleCalendarApiClient;
 
-    public GoogleCalendarService() {
+    public GoogleCalendarClient() {
         InputStream credentialFileInputStream = getClass().getResourceAsStream(CREDENTIALS_CLASSPATH);
         List<String> scopes = Collections.singletonList(CalendarScopes.CALENDAR);
 
         googleCalendarApiClient = getGoogleCalendarApiClient(APPLICATION_NAME, credentialFileInputStream, scopes);
+    }
+
+    public GoogleCalendar getCalendarByName(String calendarName) {
+        try {
+            var calendars = googleCalendarApiClient.calendarList().list().execute().getItems();
+
+            return calendars.stream()
+                    .map(this::toGoogleCalendar)
+                    .filter(calendar -> calendarName.equals(calendar.getName()))
+                    .findAny()
+                    .orElse(null);
+
+        } catch (IOException e) {
+            throw new RuntimeException("Error calling google calendar api.", e);
+        }
+    }
+
+    public GoogleCalendar createCalendar(String calendarName, ZoneId timezone) {
+        try {
+            com.google.api.services.calendar.model.Calendar calendar = new com.google.api.services.calendar.model.Calendar();
+            calendar.setSummary(calendarName);
+            calendar.setTimeZone(timezone.getId());
+
+            calendar = googleCalendarApiClient.calendars().insert(calendar).execute();
+
+            return toGoogleCalendar(calendar);
+
+        } catch (IOException e) {
+            throw new RuntimeException("Error calling google calendar api.", e);
+        }
+    }
+
+    private GoogleCalendar toGoogleCalendar(com.google.api.services.calendar.model.Calendar calendar) {
+        return new GoogleCalendar(calendar.getId(), calendar.getSummary(), ZoneId.of(calendar.getTimeZone()));
+    }
+
+    private GoogleCalendar toGoogleCalendar(CalendarListEntry calendarListEntry) {
+        return new GoogleCalendar(calendarListEntry.getId(), calendarListEntry.getSummary(), ZoneId.of(calendarListEntry.getTimeZone()));
     }
 
     public String createGoogleCalendarEvent(String summary, ZonedDateTime start, ZonedDateTime end) {
@@ -82,7 +122,7 @@ public class GoogleCalendarService {
         }
     }
 
-    private static EventDateTime toEventDateTime(ZonedDateTime zonedDateTime) {
+    private EventDateTime toEventDateTime(ZonedDateTime zonedDateTime) {
         DateTimeFormatter rfc3339DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX");
 
         DateTime googleDatetime = DateTime.parseRfc3339(zonedDateTime.format(rfc3339DateTimeFormatter));
