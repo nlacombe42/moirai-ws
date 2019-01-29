@@ -27,7 +27,7 @@ public class IcalReader {
                 .map(component -> (VEvent) component)
                 .map(icalEvent -> {
                     var event = new Event();
-                    event.setId(icalEvent.getUid().getValue());
+                    event.setIcalUid(icalEvent.getUid().getValue());
                     event.setName(icalEvent.getSummary().getValue());
                     event.setDescription(icalEvent.getDescription().getValue());
                     event.setLocation(icalEvent.getLocation() != null ? icalEvent.getLocation().getValue() : null);

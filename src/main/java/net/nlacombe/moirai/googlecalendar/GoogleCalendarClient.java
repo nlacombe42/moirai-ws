@@ -16,6 +16,7 @@ import com.google.api.services.calendar.CalendarScopes;
 import com.google.api.services.calendar.model.CalendarListEntry;
 import com.google.api.services.calendar.model.Event;
 import com.google.api.services.calendar.model.EventDateTime;
+import net.nlacombe.moirai.domain.EventParticipation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,21 +85,28 @@ public class GoogleCalendarClient {
         return new GoogleCalendar(calendarListEntry.getId(), calendarListEntry.getSummary(), ZoneId.of(calendarListEntry.getTimeZone()));
     }
 
-    public String createGoogleCalendarEvent(String summary, ZonedDateTime start, ZonedDateTime end) {
+    public String createGoogleCalendarEvent(String calendarId, net.nlacombe.moirai.domain.Event event) {
         try {
-            Event event = new Event();
-            event.setSummary(summary);
-            event.setDescription("description");
-            event.setStart(toEventDateTime(start));
-            event.setEnd(toEventDateTime(end));
-            event.setStatus("tentative");
+            Event googleEvent = new Event();
+            googleEvent.setICalUID(event.getIcalUid());
+            googleEvent.setSummary(getGoogleEventName(event));
+            googleEvent.setDescription(event.getDescription());
+            googleEvent.setStart(toEventDateTime(event.getStart()));
+            googleEvent.setEnd(toEventDateTime(event.getEnd()));
+            googleEvent.setLocation(event.getLocation());
 
-            event = googleCalendarApiClient.events().insert("primary", event).execute();
+            googleEvent = googleCalendarApiClient.events().insert(calendarId, googleEvent).execute();
 
-            return event.getId();
+            return googleEvent.getId();
         } catch (IOException e) {
             throw new RuntimeException("Error calling google calendar api.", e);
         }
+    }
+
+    private String getGoogleEventName(net.nlacombe.moirai.domain.Event event) {
+        var prefix = EventParticipation.TENTATIVE.equals(event.getParticipation()) ? "? " : "";
+
+        return prefix + event.getName();
     }
 
     public void listextEvents(String calendarId, int numberOfEventsToList) {
@@ -113,6 +121,7 @@ public class GoogleCalendarClient {
                     .getItems();
 
             events.forEach(event -> {
+                logger.info("Event ICalUid: " + event.getICalUID());
                 logger.info("Event summary: " + event.getSummary());
                 logger.info("Event start: " + event.getStart().getDateTime());
                 logger.info("Event end: " + event.getEnd().getDateTime());

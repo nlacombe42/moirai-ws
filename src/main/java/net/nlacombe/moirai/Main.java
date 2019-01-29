@@ -1,5 +1,7 @@
 package net.nlacombe.moirai;
 
+import net.nlacombe.moirai.domain.Event;
+import net.nlacombe.moirai.domain.EventParticipation;
 import net.nlacombe.moirai.googlecalendar.GoogleCalendar;
 import net.nlacombe.moirai.googlecalendar.GoogleCalendarClient;
 import net.nlacombe.moirai.ical.IcalReader;
@@ -10,6 +12,7 @@ import java.io.IOException;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Properties;
+import java.util.stream.Stream;
 
 public class Main {
 
@@ -24,10 +27,17 @@ public class Main {
         var calendar = getOrCreateCalendar(googleCalendarClient, facebookCalendarName, facebookCalendarTimezone);
 
         var eventStream = IcalReader.readFromUrl(facebookIcalUrl, calendar.getTimezone());
+
+        createFirst3IcalEventsInGoogleCalendar(googleCalendarClient, calendar, eventStream);
+    }
+
+    private static void createFirst3IcalEventsInGoogleCalendar(GoogleCalendarClient googleCalendarClient, GoogleCalendar calendar, Stream<Event> eventStream) {
         eventStream
                 .filter(event -> event.getStart().isAfter(ZonedDateTime.now()))
+                .filter(event -> !EventParticipation.DECLINED.equals(event.getParticipation()))
                 .sorted()
-                .forEach(event -> logger.info(event.toString()));
+                .limit(3)
+                .forEach(event -> googleCalendarClient.createGoogleCalendarEvent(calendar.getCalendarId(), event));
     }
 
     private static String getProperty(String fileName, String propertyName) {
@@ -49,13 +59,5 @@ public class Main {
         }
 
         return calendar;
-    }
-
-    private static void createEvent(GoogleCalendarClient googleCalendarClient) {
-        ZonedDateTime start = ZonedDateTime.now().plusDays(1).withHour(10).withMinute(0);
-        ZonedDateTime end = start.plusHours(1);
-        String eventId = googleCalendarClient.createGoogleCalendarEvent("dat eve", start, end);
-
-        logger.info("Event ID: " + eventId);
     }
 }

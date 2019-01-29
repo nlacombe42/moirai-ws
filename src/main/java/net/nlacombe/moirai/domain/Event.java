@@ -4,7 +4,7 @@ import java.time.ZonedDateTime;
 
 public class Event implements Comparable<Event> {
 
-    private String id;
+    private String icalUid;
     private String name;
     private String description;
     private String location;
@@ -20,7 +20,7 @@ public class Event implements Comparable<Event> {
     @Override
     public String toString() {
         return "Event{" +
-                "id='" + id + '\'' +
+                "icalUid='" + icalUid + '\'' +
                 ", name='" + name + '\'' +
                 ", location='" + location + '\'' +
                 ", start=" + start +
@@ -29,12 +29,12 @@ public class Event implements Comparable<Event> {
                 '}';
     }
 
-    public String getId() {
-        return id;
+    public String getIcalUid() {
+        return icalUid;
     }
 
-    public void setId(String id) {
-        this.id = id;
+    public void setIcalUid(String icalUid) {
+        this.icalUid = icalUid;
     }
 
     public String getName() {
