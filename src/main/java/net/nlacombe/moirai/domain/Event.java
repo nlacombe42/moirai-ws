@@ -1,6 +1,7 @@
 package net.nlacombe.moirai.domain;
 
 import java.time.ZonedDateTime;
+import java.util.Objects;
 
 public class Event implements Comparable<Event> {
 
@@ -15,6 +16,25 @@ public class Event implements Comparable<Event> {
     @Override
     public int compareTo(Event event) {
         return start.compareTo(event.getStart());
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Event)) return false;
+        Event event = (Event) o;
+        return Objects.equals(icalUid, event.icalUid) &&
+                Objects.equals(name, event.name) &&
+                Objects.equals(description, event.description) &&
+                Objects.equals(location, event.location) &&
+                Objects.equals(start, event.start) &&
+                Objects.equals(end, event.end) &&
+                participation == event.participation;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(icalUid, name, description, location, start, end, participation);
     }
 
     @Override

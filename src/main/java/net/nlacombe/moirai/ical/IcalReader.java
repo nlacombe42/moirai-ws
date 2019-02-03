@@ -14,37 +14,35 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.ZoneId;
-import java.util.stream.Stream;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class IcalReader {
 
-    public static Stream<Event> readFromUrl(String icalUrl, ZoneId timeZone) {
+    public static List<Event> readFromUrl(String icalUrl, ZoneId timeZone) {
         var icalInputStream = getHttpInputStream(icalUrl);
         var calendar = getCalendar(icalInputStream);
 
         return calendar.getComponents().stream()
                 .filter(component -> component instanceof VEvent)
                 .map(component -> (VEvent) component)
-                .map(icalEvent -> {
-                    var event = new Event();
-                    event.setIcalUid(icalEvent.getUid().getValue());
-                    event.setName(icalEvent.getSummary().getValue());
-                    event.setDescription(icalEvent.getDescription().getValue());
-                    event.setLocation(icalEvent.getLocation() != null ? icalEvent.getLocation().getValue() : null);
-                    event.setStart(icalEvent.getStartDate().getDate().toInstant().atZone(timeZone));
-                    event.setEnd(icalEvent.getEndDate().getDate().toInstant().atZone(timeZone));
-                    event.setParticipation(getParticipation(icalEvent.getProperty("PARTSTAT").getValue()));
-
-                    return event;
-                });
+                .map(icalEvent -> toEvent(timeZone, icalEvent))
+                .collect(Collectors.toList());
     }
 
-    private static EventParticipation getParticipation(String icalPartstatCode) {
-        try {
-            return EventParticipation.fromIcalCode(icalPartstatCode);
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
+    private static Event toEvent(ZoneId timeZone, VEvent icalEvent) {
+        var icalPartstatCode = icalEvent.getProperty("PARTSTAT").getValue();
+
+        var event = new Event();
+        event.setIcalUid(icalEvent.getUid().getValue());
+        event.setName(icalEvent.getSummary().getValue());
+        event.setDescription(icalEvent.getDescription().getValue());
+        event.setLocation(icalEvent.getLocation() != null ? icalEvent.getLocation().getValue() : null);
+        event.setStart(icalEvent.getStartDate().getDate().toInstant().atZone(timeZone));
+        event.setEnd(icalEvent.getEndDate().getDate().toInstant().atZone(timeZone));
+        event.setParticipation(EventParticipation.fromIcalCode(icalPartstatCode));
+
+        return event;
     }
 
     private static Calendar getCalendar(InputStream icalInputStream) {

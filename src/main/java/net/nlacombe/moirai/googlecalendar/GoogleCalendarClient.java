@@ -14,9 +14,11 @@ import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.calendar.Calendar;
 import com.google.api.services.calendar.CalendarScopes;
 import com.google.api.services.calendar.model.CalendarListEntry;
-import com.google.api.services.calendar.model.Event;
+import com.google.api.services.calendar.model.EventAttendee;
 import com.google.api.services.calendar.model.EventDateTime;
+import net.nlacombe.moirai.domain.Event;
 import net.nlacombe.moirai.domain.EventParticipation;
+import org.apache.commons.collections4.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,7 +27,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.security.GeneralSecurityException;
-import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -45,6 +46,20 @@ public class GoogleCalendarClient {
         List<String> scopes = Collections.singletonList(CalendarScopes.CALENDAR);
 
         googleCalendarApiClient = getGoogleCalendarApiClient(APPLICATION_NAME, credentialFileInputStream, scopes);
+    }
+
+    public String getPrimaryCalendarEmail() {
+        try {
+            var calendar = googleCalendarApiClient.calendarList().get("primary").execute();
+
+            if (!calendar.getId().endsWith("@gmail.com"))
+                throw new RuntimeException("Primary Google Calendar email not found.");
+
+            return calendar.getId();
+
+        } catch (IOException e) {
+            throw new RuntimeException("Error calling google calendar api.", e);
+        }
     }
 
     public GoogleCalendar getCalendarByName(String calendarName) {
@@ -77,23 +92,26 @@ public class GoogleCalendarClient {
         }
     }
 
-    private GoogleCalendar toGoogleCalendar(com.google.api.services.calendar.model.Calendar calendar) {
-        return new GoogleCalendar(calendar.getId(), calendar.getSummary(), ZoneId.of(calendar.getTimeZone()));
-    }
-
-    private GoogleCalendar toGoogleCalendar(CalendarListEntry calendarListEntry) {
-        return new GoogleCalendar(calendarListEntry.getId(), calendarListEntry.getSummary(), ZoneId.of(calendarListEntry.getTimeZone()));
-    }
-
-    public String createGoogleCalendarEvent(String calendarId, net.nlacombe.moirai.domain.Event event) {
+    public GoogleEvent getEventFromIcalUid(String calendarId, String icalUid) {
         try {
-            Event googleEvent = new Event();
-            googleEvent.setICalUID(event.getIcalUid());
-            googleEvent.setSummary(getGoogleEventName(event));
-            googleEvent.setDescription(event.getDescription());
-            googleEvent.setStart(toEventDateTime(event.getStart()));
-            googleEvent.setEnd(toEventDateTime(event.getEnd()));
-            googleEvent.setLocation(event.getLocation());
+            return googleCalendarApiClient.events().list(calendarId)
+                    .setICalUID(icalUid)
+                    .setMaxResults(1)
+                    .setSingleEvents(true)
+                    .execute()
+                    .getItems()
+                    .stream()
+                    .map(this::toEvent)
+                    .findAny()
+                    .orElse(null);
+        } catch (IOException e) {
+            throw new RuntimeException("Error calling google calendar api.", e);
+        }
+    }
+
+    public String createEvent(String calendarId, Event event) {
+        try {
+            var googleEvent = getGoogleEvent(getPrimaryCalendarEmail(), event);
 
             googleEvent = googleCalendarApiClient.events().insert(calendarId, googleEvent).execute();
 
@@ -103,32 +121,71 @@ public class GoogleCalendarClient {
         }
     }
 
-    private String getGoogleEventName(net.nlacombe.moirai.domain.Event event) {
-        var prefix = EventParticipation.TENTATIVE.equals(event.getParticipation()) ? "? " : "";
-
-        return prefix + event.getName();
-    }
-
-    public void listextEvents(String calendarId, int numberOfEventsToList) {
+    public void updateEvent(String calendarId, GoogleEvent event) {
         try {
-            DateTime now = new DateTime(Instant.now().toEpochMilli());
-            var events = googleCalendarApiClient.events().list(calendarId)
-                    .setMaxResults(numberOfEventsToList)
-                    .setTimeMin(now)
-                    .setOrderBy("startTime")
-                    .setSingleEvents(true)
-                    .execute()
-                    .getItems();
+            var googleEvent = getGoogleEvent(getPrimaryCalendarEmail(), event);
+            googleEvent.setId(event.getGoogleEventId());
 
-            events.forEach(event -> {
-                logger.info("Event ICalUid: " + event.getICalUID());
-                logger.info("Event summary: " + event.getSummary());
-                logger.info("Event start: " + event.getStart().getDateTime());
-                logger.info("Event end: " + event.getEnd().getDateTime());
-            });
+            googleCalendarApiClient.events().update(calendarId, googleEvent.getId(), googleEvent).execute();
         } catch (IOException e) {
             throw new RuntimeException("Error calling google calendar api.", e);
         }
+    }
+
+    private com.google.api.services.calendar.model.Event getGoogleEvent(String userEmailAddress, Event event) {
+        var googleEventAttendee = new EventAttendee();
+        googleEventAttendee.setSelf(true);
+        googleEventAttendee.setResponseStatus(event.getParticipation().getGoogleCalendarCode());
+        googleEventAttendee.setEmail(userEmailAddress);
+
+        com.google.api.services.calendar.model.Event googleEvent = new com.google.api.services.calendar.model.Event();
+        googleEvent.setICalUID(event.getIcalUid());
+        googleEvent.setSummary(event.getName());
+        googleEvent.setDescription(event.getDescription());
+        googleEvent.setStart(toEventDateTime(event.getStart()));
+        googleEvent.setEnd(toEventDateTime(event.getEnd()));
+        googleEvent.setLocation(event.getLocation());
+        googleEvent.setAttendees(Collections.singletonList(googleEventAttendee));
+        googleEvent.setStatus("confirmed");
+
+        return googleEvent;
+    }
+
+    private GoogleEvent toEvent(com.google.api.services.calendar.model.Event googleEvent) {
+        var event = new GoogleEvent();
+        event.setGoogleEventId(googleEvent.getId());
+        event.setIcalUid(googleEvent.getICalUID());
+        event.setName(googleEvent.getSummary());
+        event.setStart(toZonedDateTime(googleEvent.getStart()));
+        event.setEnd(toZonedDateTime(googleEvent.getEnd()));
+        event.setLocation(googleEvent.getLocation());
+        event.setDescription(googleEvent.getDescription());
+        event.setParticipation(toEventParticipation(googleEvent.getAttendees()));
+
+        return event;
+    }
+
+    private EventParticipation toEventParticipation(List<EventAttendee> attendees) {
+        if (CollectionUtils.isEmpty(attendees))
+            return EventParticipation.NEEDS_ACTION;
+
+        return attendees.stream()
+                .filter(EventAttendee::isSelf)
+                .findAny()
+                .map(attendee -> EventParticipation.fromGoogleCalendarCode(attendee.getResponseStatus()))
+                .orElse(EventParticipation.NEEDS_ACTION);
+    }
+
+    private ZonedDateTime toZonedDateTime(EventDateTime eventDateTime) {
+        return ZonedDateTime.parse(eventDateTime.getDateTime().toStringRfc3339());
+    }
+
+    private GoogleCalendar toGoogleCalendar(com.google.api.services.calendar.model.Calendar calendar) {
+        return new GoogleCalendar(calendar.getId(), calendar.getSummary(), ZoneId.of(calendar.getTimeZone()));
+    }
+
+    private GoogleCalendar toGoogleCalendar(CalendarListEntry calendarListEntry) {
+        return new GoogleCalendar(calendarListEntry.getId(), calendarListEntry.getSummary(), ZoneId.of(calendarListEntry.getTimeZone()));
     }
 
     private EventDateTime toEventDateTime(ZonedDateTime zonedDateTime) {
