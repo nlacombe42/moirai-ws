@@ -16,6 +16,8 @@ import com.google.api.services.calendar.CalendarScopes;
 import com.google.api.services.calendar.model.CalendarListEntry;
 import com.google.api.services.calendar.model.EventAttendee;
 import com.google.api.services.calendar.model.EventDateTime;
+import net.nlacombe.commonlib.stream.PageIterator;
+import net.nlacombe.commonlib.stream.StreamUtil;
 import net.nlacombe.moirai.domain.Event;
 import net.nlacombe.moirai.domain.EventParticipation;
 import org.apache.commons.collections4.CollectionUtils;
@@ -32,6 +34,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Stream;
 
 public class GoogleCalendarClient {
 
@@ -97,6 +100,7 @@ public class GoogleCalendarClient {
             return googleCalendarApiClient.events().list(calendarId)
                     .setICalUID(icalUid)
                     .setMaxResults(1)
+                    .setShowDeleted(true)
                     .setSingleEvents(true)
                     .execute()
                     .getItems()
@@ -107,6 +111,41 @@ public class GoogleCalendarClient {
         } catch (IOException e) {
             throw new RuntimeException("Error calling google calendar api.", e);
         }
+    }
+
+    public Stream<GoogleEvent> getAllEvents(String calendarId) {
+        var pageIterator = new PageIterator<com.google.api.services.calendar.model.Event>() {
+
+            private String pageToken = null;
+            private boolean firstPage = true;
+
+            @Override
+            public boolean hasNext() {
+                return firstPage || pageToken != null;
+            }
+
+            @Override
+            public List<com.google.api.services.calendar.model.Event> next() {
+                try {
+                    var response = googleCalendarApiClient.events().list(calendarId)
+                            .setPageToken(pageToken)
+                            .setMaxResults(250)
+                            .setShowDeleted(false)
+                            .setSingleEvents(true)
+                            .execute();
+
+                    pageToken = response.getNextPageToken();
+                    firstPage = false;
+
+                    return response.getItems();
+                } catch (IOException e) {
+                    throw new RuntimeException("Error calling google calendar api.", e);
+                }
+            }
+        };
+
+        return StreamUtil.createStreamFromPageIterator(pageIterator)
+                .map(this::toEvent);
     }
 
     public String createEvent(String calendarId, Event event) {
@@ -127,6 +166,14 @@ public class GoogleCalendarClient {
             googleEvent.setId(event.getGoogleEventId());
 
             googleCalendarApiClient.events().update(calendarId, googleEvent.getId(), googleEvent).execute();
+        } catch (IOException e) {
+            throw new RuntimeException("Error calling google calendar api.", e);
+        }
+    }
+
+    public void removeEvent(String calendarId, String googleEventId) {
+        try {
+            googleCalendarApiClient.events().delete(calendarId, googleEventId).execute();
         } catch (IOException e) {
             throw new RuntimeException("Error calling google calendar api.", e);
         }

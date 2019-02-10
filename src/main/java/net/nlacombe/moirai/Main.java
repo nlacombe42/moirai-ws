@@ -14,6 +14,8 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Properties;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class Main {
 
@@ -41,13 +43,19 @@ public class Main {
     }
 
     private static void syncGoogleCalendarWithIcalEvents(GoogleCalendarClient googleCalendarClient, GoogleCalendar calendar, List<Event> sourceEvents) {
+        var sourceEventsByIcalUid = sourceEvents.stream().collect(Collectors.toMap(Event::getIcalUid, Function.identity()));
+
         sourceEvents.stream()
                 .filter(event -> event.getStart().isAfter(ZonedDateTime.now()))
                 .sorted()
-                .forEach(event -> syncGoogleCalendarWithIcalEvent(googleCalendarClient, calendar, event));
+                .forEach(event -> updateOrCreateEventInGoogleCalendar(googleCalendarClient, calendar, event));
+
+        googleCalendarClient.getAllEvents(calendar.getCalendarId())
+                .filter(event -> !sourceEventsByIcalUid.containsKey(event.getIcalUid()))
+                .forEach(event -> googleCalendarClient.removeEvent(calendar.getCalendarId(), event.getGoogleEventId()));
     }
 
-    private static void syncGoogleCalendarWithIcalEvent(GoogleCalendarClient googleCalendarClient, GoogleCalendar calendar, Event icalEvent) {
+    private static void updateOrCreateEventInGoogleCalendar(GoogleCalendarClient googleCalendarClient, GoogleCalendar calendar, Event icalEvent) {
         var existingGoogleEvent = googleCalendarClient.getEventFromIcalUid(calendar.getCalendarId(), icalEvent.getIcalUid());
 
         if (existingGoogleEvent == null) {
