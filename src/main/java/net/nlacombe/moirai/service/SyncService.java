@@ -1,4 +1,4 @@
-package net.nlacombe.moirai;
+package net.nlacombe.moirai.service;
 
 import net.nlacombe.moirai.domain.Event;
 import net.nlacombe.moirai.googlecalendar.GoogleCalendar;
@@ -7,28 +7,37 @@ import net.nlacombe.moirai.ical.IcalReader;
 import org.apache.commons.beanutils.BeanUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
-import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
-import java.util.Properties;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class Main {
+@Service
+public class SyncService {
 
-    private static final Logger logger = LoggerFactory.getLogger(Main.class);
+    private static final Logger logger = LoggerFactory.getLogger(SyncService.class);
 
-    public static void main(String... args) {
-        var sourceCalendarIcalUrl = getProperty("secrets.properties", "sourceCalendar.ical.url");
-        var targetCalendarName = getProperty("config.properties", "targetCalendar.name");
-        var targetCalendarDefaultTimezone = ZoneId.of(getProperty("config.properties", "targetCalendar.defaultTimezone"));
+    private String targetCalendarName;
+    private String targetCalendarDefaultTimezoneText;
+
+    public SyncService(@Value("${targetCalendar.name}") String targetCalendarName,
+                       @Value("${targetCalendar.defaultTimezone}") String targetCalendarDefaultTimezoneText) {
+
+        this.targetCalendarName = targetCalendarName;
+        this.targetCalendarDefaultTimezoneText = targetCalendarDefaultTimezoneText;
+    }
+
+    public void sync(String sourceCalendarIcalUrl, String googleUserAccessToken, String googleUserRefreshToken) {
+        var targetCalendarDefaultTimezone = ZoneId.of(targetCalendarDefaultTimezoneText);
 
         logger.info("Syncing from ICal URL \"" + sourceCalendarIcalUrl + "\" to Google Calendar with name \"" + targetCalendarName + "\".");
 
-        var googleCalendarClient = new GoogleCalendarClient();
+        var googleCalendarClient = new GoogleCalendarClient(googleUserAccessToken, googleUserRefreshToken);
         var calendar = getOrCreateCalendar(googleCalendarClient, targetCalendarName, targetCalendarDefaultTimezone);
 
         logger.info("Reading from source URL...");
@@ -74,17 +83,6 @@ public class Main {
             BeanUtils.copyProperties(targetBean, sourceBean);
         } catch (IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException(e);
-        }
-    }
-
-    private static String getProperty(String fileName, String propertyName) {
-        try {
-            Properties properties = new Properties();
-            properties.load(Main.class.getResourceAsStream("/" + fileName));
-
-            return properties.getProperty(propertyName);
-        } catch (IOException e) {
-            throw new RuntimeException("Could not read property \"" + propertyName + "\" from classpath file \"" + fileName + "\".");
         }
     }
 
