@@ -22,6 +22,11 @@ version = '0.0.1'
 sourceCompatibility = 11
 targetCompatibility = 11
 
+project.ext.gcloudBuildDir = file('build/appengine/')
+project.ext.gcloudProjectId = 'nlacombe-net-prod'
+
+def String gcloudDockerImageUrl
+
 dependencies {
 	compile 'net.nlacombe:common-lib:8.0.0'
 
@@ -50,7 +55,7 @@ wrapper {
 	gradleVersion = '5.1.1'
 }
 
-task buildDocker(type: Docker, dependsOn: assemble) {
+task buildLocalDockerImage(type: Docker, dependsOn: assemble) {
 	tag = "${project.name}"
 	dockerfile = file('src/main/docker/Dockerfile')
 	doFirst {
@@ -60,4 +65,38 @@ task buildDocker(type: Docker, dependsOn: assemble) {
 			into stageDir
 		}
 	}
+}
+
+task buildGcloudDockerImage(type: Exec, dependsOn: build) {
+	def buildStartTime = new Date()
+	gcloudDockerImageUrl = getGcloudDockerImageUrl(buildStartTime)
+
+	workingDir project.gcloudBuildDir
+	commandLine 'gcloud', 'builds', 'submit', '--tag', gcloudDockerImageUrl
+
+	doFirst {
+		copy {
+			from jar
+			from file('src/main/docker/')
+			into project.gcloudBuildDir
+		}
+	}
+}
+
+task deployToProdGcloud(type: Exec, dependsOn: buildGcloudDockerImage) {
+	workingDir project.gcloudBuildDir
+	commandLine 'gcloud', 'alpha', 'run', 'deploy', "${project.name}",
+			'--region', 'us-central1',
+			'--memory', '500M',
+			'--image', gcloudDockerImageUrl
+}
+
+def getGcloudDockerImageUrl(date) {
+	def version = project.version + '-' + getDateTimestamp(date)
+
+	return "gcr.io/${project.gcloudProjectId}/${project.name}:${version}"
+}
+
+def static getDateTimestamp(date) {
+	return date.format('yyyyMMddHHmmss')
 }
