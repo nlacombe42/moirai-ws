@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import javax.inject.Inject;
 import java.lang.reflect.InvocationTargetException;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -22,33 +23,42 @@ public class SyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(SyncService.class);
 
+    private EmailSenderService emailSenderService;
     private String targetCalendarName;
     private String targetCalendarDefaultTimezoneText;
 
-    public SyncService(@Value("${targetCalendar.name}") String targetCalendarName,
+    @Inject
+    public SyncService(EmailSenderService emailSenderService,
+                       @Value("${targetCalendar.name}") String targetCalendarName,
                        @Value("${targetCalendar.defaultTimezone}") String targetCalendarDefaultTimezoneText) {
 
+        this.emailSenderService = emailSenderService;
         this.targetCalendarName = targetCalendarName;
         this.targetCalendarDefaultTimezoneText = targetCalendarDefaultTimezoneText;
     }
 
     public void sync(String sourceCalendarIcalUrl, String googleUserAccessToken, String googleUserRefreshToken) {
-        var targetCalendarDefaultTimezone = ZoneId.of(targetCalendarDefaultTimezoneText);
+        try {
+            var targetCalendarDefaultTimezone = ZoneId.of(targetCalendarDefaultTimezoneText);
 
-        logger.info("Syncing from ICal URL \"" + sourceCalendarIcalUrl + "\" to Google Calendar with name \"" + targetCalendarName + "\".");
+            logger.info("Syncing from ICal URL \"" + sourceCalendarIcalUrl + "\" to Google Calendar with name \"" + targetCalendarName + "\".");
 
-        var googleCalendarClient = new GoogleCalendarClient(googleUserAccessToken, googleUserRefreshToken);
-        var calendar = getOrCreateCalendar(googleCalendarClient, targetCalendarName, targetCalendarDefaultTimezone);
+            var googleCalendarClient = new GoogleCalendarClient(googleUserAccessToken, googleUserRefreshToken);
+            var calendar = getOrCreateCalendar(googleCalendarClient, targetCalendarName, targetCalendarDefaultTimezone);
 
-        logger.info("Reading from source URL...");
-        var sourceEvents = IcalReader.readFromUrl(sourceCalendarIcalUrl, calendar.getTimezone());
+            logger.info("Reading from source URL...");
+            var sourceEvents = IcalReader.readFromUrl(sourceCalendarIcalUrl, calendar.getTimezone());
 
-        logger.info("Found " + sourceEvents.size() + " future source events to sync.");
-        logger.info("Primary google calendar email: " + googleCalendarClient.getPrimaryCalendarEmail());
+            logger.info("Found " + sourceEvents.size() + " future source events to sync.");
+            logger.info("Primary google calendar email: " + googleCalendarClient.getPrimaryCalendarEmail());
 
-        logger.info("Sycing to Google Calendar...");
-        syncGoogleCalendarWithIcalEvents(googleCalendarClient, calendar, sourceEvents);
-        logger.info("Done.");
+            logger.info("Sycing to Google Calendar...");
+            syncGoogleCalendarWithIcalEvents(googleCalendarClient, calendar, sourceEvents);
+            logger.info("Done.");
+        } catch (Exception e) {
+            emailSenderService.sendErrorEmail(e);
+            throw e;
+        }
     }
 
     private static void syncGoogleCalendarWithIcalEvents(GoogleCalendarClient googleCalendarClient, GoogleCalendar calendar, List<Event> sourceEvents) {
