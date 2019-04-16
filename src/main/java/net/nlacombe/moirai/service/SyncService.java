@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import javax.inject.Inject;
 import java.lang.reflect.InvocationTargetException;
+import java.net.SocketException;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -56,7 +57,10 @@ public class SyncService {
             syncGoogleCalendarWithIcalEvents(googleCalendarClient, calendar, sourceEvents);
             logger.info("Done.");
         } catch (Exception e) {
-            emailSenderService.sendErrorEmail(e);
+
+            if(shouldSendEmailForThrowable(e))
+                emailSenderService.sendErrorEmail(e);
+
             throw e;
         }
     }
@@ -106,5 +110,14 @@ public class SyncService {
         }
 
         return calendar;
+    }
+
+    private boolean shouldSendEmailForThrowable(Throwable throwable) {
+        return !isThrowableOrCauseOfType(throwable, SocketException.class);
+    }
+
+    private static boolean isThrowableOrCauseOfType(Throwable throwable, Class<?> clazz) {
+        return clazz.isAssignableFrom(throwable.getClass()) ||
+                (throwable.getCause() != null && isThrowableOrCauseOfType(throwable.getCause(), clazz));
     }
 }
