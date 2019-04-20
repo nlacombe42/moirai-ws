@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import javax.inject.Inject;
 import java.lang.reflect.InvocationTargetException;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -113,7 +114,8 @@ public class SyncService {
     }
 
     private boolean shouldSendEmailForThrowable(Throwable throwable) {
-        return !isThrowableOrCauseOfType(throwable, SocketException.class);
+        return !isThrowableOrCauseOfType(throwable, SocketException.class) &&
+                !isThrowableOrCauseOfType(throwable, SocketTimeoutException.class);
     }
 
     private static boolean isThrowableOrCauseOfType(Throwable throwable, Class<?> clazz) {
