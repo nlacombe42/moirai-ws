@@ -1,1 +1,1 @@
-gcloud beta scheduler jobs create http moirai-api-sync-2 --schedule=*/5 * * * * --uri=https://moirai-api.nlacombe.net/api/v1/syncIcalWithGoogleCalendar --headers=Content-Type=application/json --http-method=post --time-zone=America/Montreal --message-body-from-file=data.json
+gcloud beta scheduler jobs create http moirai-api-sync-name-of-fb-cal --schedule="*/5 * * * *" --uri=https://moirai-api.nlacombe.net/api/v1/syncIcalWithGoogleCalendar --headers=Content-Type=application/json --http-method=post --time-zone=America/Montreal --message-body-from-file=data.json
