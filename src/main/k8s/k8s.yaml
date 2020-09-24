@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: moirai-ws
-          image: gcr.io/nlacombe-net-prod/moirai-ws:0.0.1-20190504191802
+          image: gcr.io/nlacombe-net-prod/moirai-ws:0.0.1-20200924181411
           env:
             - name: PORT
               value: "80"
@@ -25,6 +25,10 @@ spec:
           resources:
             requests:
               cpu: 50m
+              memory: 300Mi
+            limits:
+              cpu: 200m
+              memory: 500Mi
 ---
 apiVersion: v1
 kind: Service

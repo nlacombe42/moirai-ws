@@ -28,22 +28,22 @@ project.ext.gcloudProjectId = 'nlacombe-net-prod'
 def String gcloudDockerImageUrl
 
 dependencies {
-	compile 'net.nlacombe:common-lib:8.0.0'
+	implementation 'net.nlacombe:common-lib:10.4.0'
 
-	compile 'org.springframework.boot:spring-boot-starter-web'
-	compile 'org.springframework.boot:spring-boot-starter-actuator'
-	compile 'org.springframework.boot:spring-boot-starter-security'
-	compile 'org.springframework.boot:spring-boot-starter-mail'
-	compile 'javax.inject:javax.inject:1'
-	compile 'com.google.api-client:google-api-client:1.23.0'
-	compile 'com.google.oauth-client:google-oauth-client-jetty:1.23.0'
-	compile 'com.google.apis:google-api-services-calendar:v3-rev305-1.23.0'
-	compile 'org.mnode.ical4j:ical4j:3.0.6'
-	compile 'org.ehcache:jcache:1.0.1'
-	compile 'org.apache.commons:commons-collections4:4.2'
-	compile 'commons-beanutils:commons-beanutils:1.9.3'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-mail'
+	implementation 'javax.inject:javax.inject:1'
+	implementation 'com.google.api-client:google-api-client:1.23.0'
+	implementation 'com.google.oauth-client:google-oauth-client-jetty:1.23.0'
+	implementation 'com.google.apis:google-api-services-calendar:v3-rev305-1.23.0'
+	implementation 'org.mnode.ical4j:ical4j:3.0.6'
+	implementation 'org.ehcache:jcache:1.0.1'
+	implementation 'org.apache.commons:commons-collections4:4.2'
+	implementation 'commons-beanutils:commons-beanutils:1.9.3'
 
-	compile 'org.slf4j:slf4j-api:1.7.25'
+	implementation 'org.slf4j:slf4j-api:1.7.25'
 	runtime 'ch.qos.logback:logback-classic:1.2.3'
 }
 

@@ -136,7 +136,7 @@ public class GoogleCalendarClient {
             }
         };
 
-        return StreamUtil.createStreamFromPageIterator(pageIterator)
+        return StreamUtil.createStream(pageIterator)
                 .map(this::toEvent);
     }
 
