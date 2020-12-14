@@ -17,7 +17,7 @@ apply plugin: 'io.spring.dependency-management'
 defaultTasks 'tasks'
 
 group = 'net.nlacombe'
-version = '0.0.1'
+version = '0.0.2'
 
 sourceCompatibility = 11
 targetCompatibility = 11
@@ -47,7 +47,7 @@ dependencies {
 	runtime 'ch.qos.logback:logback-classic:1.2.3'
 }
 
-repositories { 
+repositories {
 	mavenCentral()
 	mavenLocal()
 }
